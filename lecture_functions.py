@@ -1,4 +1,4 @@
-class DeBruijnGraph:
+class DeBruijnGraph:  # todo: change to weighted graph (instead of multigraph) to improve memory
     """ De Bruijn directed multigraph built from a collection of
         strings. User supplies strings and k-mer length k.  Nodes
         are k-1-mers.  An Edge corresponds to the k-mer that joins
@@ -78,49 +78,6 @@ class DeBruijnGraph:
         """ Return # edges """
         return len(self.G)
 
-    def hasEulerianWalk(self):
-        """ Return true iff graph has Eulerian walk. """
-        return self.nneither == 0 and self.nsemi == 2
-
-    def hasEulerianCycle(self):
-        """ Return true iff graph has Eulerian cycle. """
-        return self.nneither == 0 and self.nsemi == 0
-
-    def isEulerian(self):
-        """ Return true iff graph has Eulerian walk or cycle """
-        # technically, if it has an Eulerian walk
-        return self.hasEulerianWalk() or self.hasEulerianCycle()
-
-    def eulerianWalkOrCycle(self):
-        """ Find and return sequence of nodes (represented by
-            their k-1-mer labels) corresponding to Eulerian walk
-            or cycle """
-        assert self.isEulerian()
-        g = self.G
-        if self.hasEulerianWalk():
-            g = g.copy()
-            g.setdefault(self.tail, []).append(self.head)
-        # graph g has an Eulerian cycle
-        tour = []
-        src = next(iter(g.keys()))  # pick arbitrary starting node
-
-        def __visit(n):
-            while len(g[n]) > 0:
-                dst = g[n].pop()
-                __visit(dst)
-            tour.append(n)
-
-        __visit(src)
-        tour = tour[::-1][:-1]  # reverse and then take all but last node
-
-        if self.hasEulerianWalk():
-            # Adjust node list so that it starts at head and ends at tail
-            sti = tour.index(self.head)
-            tour = tour[sti:] + tour[:sti]
-
-        # Return node list
-        return list(map(str, tour))
-
 
 def neighbors1mm(kmer, alpha):
     """ Generate all neighbors at Hamming distance 1 from kmer """
@@ -130,12 +87,12 @@ def neighbors1mm(kmer, alpha):
         for c in alpha:
             if c == oldc: continue
             neighbors.append(kmer[:j] + c + kmer[j + 1:])
-    return neighbors
+    return neighbors  # todo: change to iterator to improve memory
 
 
 def kmerHist(reads, k):
-    """ Return k-mer histogram and average # k-mer occurrences """
-    kmerhist = {}
+    """ Return k-mer histogram and average k-mer occurrences """
+    kmerhist = {}  # todo: change to bloom filters if max memory is exceeded (only if desperate, it's lots of work)
     for read in reads:
         for kmer in [read[i:i + k] for i in range(len(read) - (k - 1))]:
             kmerhist[kmer] = kmerhist.get(kmer, 0) + 1
