@@ -3,10 +3,6 @@ import argparse
 from Bio import SeqIO
 from os import path
 from lecture_functions import kmerHist, correct1mm, DeBruijnGraph
-from math import ceil
-from memory_test import display_top
-import tracemalloc
-from collections import Counter
 
 
 def parse_options():
@@ -30,7 +26,7 @@ def check_input(reads_path, contigs_path):
 
 def get_reads(reads_path):
     record = SeqIO.parse(reads_path, "fasta")
-    reads = [seq.seq for seq in record]  # todo: change to iterator to improve memory
+    reads = [str(seq.seq) for seq in record]
     return reads
 
 
@@ -38,48 +34,84 @@ def select_parameters():
     """Returns kmer size and frequency threshold for kmer correction """
     avg_read_length = 80
     avg_read_number = 1000
-    k = 7
+    k = 15  # todo: test for different values
     expected_kmer_occ = (avg_read_length - k + 1) * avg_read_number / 4 ** k
-    freq_thr = ceil(expected_kmer_occ / 2)  # todo: check if optimal (plot histogram?)
-    print(
-        f"Expected number of kmer occurences is {expected_kmer_occ}. Will try to correct kmers with <= {freq_thr} occurences")
+    freq_thr = 2  # todo: test for different values
+    print(f"Expected number of kmer occurrences is {expected_kmer_occ}."
+          f"Will try to correct kmers with <= {freq_thr} occurrences")
     return k, freq_thr
 
 
 def correct_reads(reads, k, freq_threshold):
     kmerhist = kmerHist(reads, k)
     alphabet = ["A", "T", "G", "C"]
-    corrected_reads = []  # todo: change to iterator to improve memory
+    corrected_reads = []
     for read in reads:
-        for letter in read:
-            assert letter in alphabet
         read = correct1mm(read, k, kmerhist, alphabet, freq_threshold)
         corrected_reads.append(read)
     return corrected_reads
 
 
-def refine(graph):
-    """ optional """
-    """ Remove remaining "islands", “tips” and “bubbles” so that contigs are more obvious"""
-    pass
+def get_contigs_greedy(DB_graph, k):
+    """Get contigs from DeBruijn graph using greedy approach: iteratively merge pairs of nodes,
+     starting with the pair that is connected by the edge with biggest weight"""
+
+    contigs = list(DB_graph.k1mers)
+    weights = DB_graph.weights  # map from (Node1, Node2) to edge weight
+    weights = sorted([(item[0][0], item[0][1], item[1]) for item in weights.items()],
+                     key=lambda x: x[2])  # sorted by weight
+
+    while weights:
+        best_edge = weights.pop()
+        left_seq = best_edge[0]
+        right_seq = best_edge[1]
+        new_contig = left_seq + right_seq[k - 2:]
+        contigs.remove(left_seq)
+        contigs.remove(right_seq)
+        contigs.append(new_contig)
+        new_weights = []
+        for edge in weights:  # we merged two graph nodes, so we need to update their previous edges
+            el = edge[0]
+            er = edge[1]
+            if el == right_seq:  # edges from the 2nd node should now start in the merged node
+                new_edge = (new_contig, edge[1], edge[2])
+                new_weights.append(new_edge)
+            if er == left_seq:  # edges previously pointing to the 1st node should point to the merged node
+                new_edge = (edge[0], new_contig, edge[2])
+                new_weights.append(new_edge)
+            if not (el == left_seq or er == right_seq or el == right_seq or er == left_seq):  # delete edges starting at 1st node or pointing to 2nd node
+                new_weights.append(edge)
+        weights = new_weights
+    return contigs
 
 
-def extract_contigs(graph):
-    """ Extracts contigs from de Bruijn graphs using the greedy approach (as in the greedy SCS algorithm)."""
-    pass
+def filter_contigs(contigs, minlen):
+    filtered = []
+    for contig in contigs:
+        if len(contig) >= minlen:
+            filtered.append(contig)
+    return filtered
+
+
+def save_contigs(contigs, filename):
+    contigfile = open(filename, "w")
+    for i in range(len(contigs)):
+        if len(contigs[i]) > 300:
+            contigfile.write(f">Contig{i}\n")
+            contigfile.write(f"{contigs[i]}\n")
+    contigfile.close()
 
 
 def main():
-    tracemalloc.start() # memory check
-    counts = Counter() # memory check
     reads_path, contigs_path = parse_options()
     check_input(reads_path, contigs_path)
     reads = get_reads(reads_path)
     k, freq_thr = select_parameters()
     corrected_reads = correct_reads(reads, k, freq_thr)
     DB_graph = DeBruijnGraph(corrected_reads, k)
-    snapshot = tracemalloc.take_snapshot() # memory check
-    display_top(snapshot) # memory check
+    contigs = get_contigs_greedy(DB_graph, k)
+    long_contigs = filter_contigs(contigs, 300)
+    save_contigs(long_contigs, contigs_path)
 
 
 if __name__ == "__main__":
