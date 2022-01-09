@@ -42,9 +42,6 @@ def kmerHist(reads, k):
     for read in reads:
         for kmer in [read[i:i + k] for i in range(len(read) - (k - 1))]:
             kmerhist[kmer] = kmerhist.get(kmer, 0) + 1
-    frequencies = list(kmerhist.values())
-    plt.hist(frequencies)
-    plt.show()
     return kmerhist
 
 
