@@ -32,13 +32,8 @@ def get_reads(reads_path):
 
 def select_parameters():
     """Returns kmer size and frequency threshold for kmer correction """
-    avg_read_length = 80
-    avg_read_number = 1000
     k = 15  # todo: test for different values
-    expected_kmer_occ = (avg_read_length - k + 1) * avg_read_number / 4 ** k
     freq_thr = 2  # todo: test for different values
-    print(f"Expected number of kmer occurrences is {expected_kmer_occ}."
-          f"Will try to correct kmers with <= {freq_thr} occurrences")
     return k, freq_thr
 
 
@@ -54,7 +49,7 @@ def correct_reads(reads, k, freq_threshold):
 
 def get_contigs_greedy(DB_graph, k):
     """Get contigs from DeBruijn graph using greedy approach: iteratively merge pairs of nodes,
-     starting with the pair that is connected by the edge with biggest weight"""
+     starting with the pair that is connected by the edge with highest weight"""
 
     contigs = list(DB_graph.k1mers)
     weights = DB_graph.weights  # map from (Node1, Node2) to edge weight
@@ -73,13 +68,17 @@ def get_contigs_greedy(DB_graph, k):
         for edge in weights:  # we merged two graph nodes, so we need to update their previous edges
             el = edge[0]
             er = edge[1]
-            if el == right_seq:  # edges from the 2nd node should now start in the merged node
+            if el == er:
+                pass
+            elif el == right_seq and er == left_seq:  # would create a cycle, delete
+                pass
+            elif el == right_seq:  # edges from the 2nd node should now start in the merged node
                 new_edge = (new_contig, edge[1], edge[2])
                 new_weights.append(new_edge)
-            if er == left_seq:  # edges previously pointing to the 1st node should point to the merged node
+            elif er == left_seq:  # edges previously pointing to the 1st node should point to the merged node
                 new_edge = (edge[0], new_contig, edge[2])
                 new_weights.append(new_edge)
-            if not (el == left_seq or er == right_seq or el == right_seq or er == left_seq):  # delete edges starting at 1st node or pointing to 2nd node
+            elif el != left_seq and er != right_seq:  # delete edges starting at 1st node or pointing to 2nd node
                 new_weights.append(edge)
         weights = new_weights
     return contigs
