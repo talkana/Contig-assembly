@@ -18,6 +18,6 @@ Using greedy approach we iteratively merge nodes (a, b) that are connected by th
 The merging process is finished when there are no more edges in the graph. Each node corresponds to one contig. Contigs shorter than 300 bp are ignored and will not be written to the output file. 
 ##### Parameters (k-mer size and minimal number of k-mer occurences)
 We've chosen the optimal k-mer size (18) and threshold for k-mer filtering (<= 1 occurences) after tests on average datasets (reads1.fasta, reads2.fastam reads3.fasta). We compared the sum of the overall scores calculated by evaluate.sh for the three datasets. 
-![plot](parameter_results.png)
+![plot](summed_scores.png)
 ### Usage
 `assembly.py input_reads.fasta output_contigs.fasta` 
