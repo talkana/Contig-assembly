@@ -119,6 +119,8 @@ def get_contigs_greedy(DB_graph, k):
         best_edge = weights.pop()
         left_seq = best_edge[0]
         right_seq = best_edge[1]
+        if left_seq == right_seq:
+            continue
         new_contig = left_seq + right_seq[k - 2:]
         contigs.remove(left_seq)
         contigs.remove(right_seq)
@@ -127,9 +129,7 @@ def get_contigs_greedy(DB_graph, k):
         for edge in weights:  # update edges
             el = edge[0]
             er = edge[1]
-            if el == er:
-                pass
-            elif el == right_seq and er == left_seq:  # would create a cycle, delete
+            if el == right_seq and er == left_seq:  # would create a cycle, delete
                 pass
             elif el == right_seq:  # edges starting in the 2nd node should start in the merged node
                 new_edge = (new_contig, edge[1], edge[2])
