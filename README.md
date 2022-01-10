@@ -9,7 +9,7 @@ Our script aims to assemble contigs from NGS reads. Typical parameters of the in
 ### Approach
 We try to correct infrequent k-mers. Then we build DeBruijn weighted graph and retreive contigs using greedy approach.  
 ##### Error correction
-We calculate the total number of occurances of each 18-mer in input reads. Then for 18-mers that occured only once we search for a similar 18-mer (Hamming distance < 1) that has > 1 occurences. If we find it, we replace the infrequent 18-mer with the more frequent one.   
+We calculate the total number of occurances of each 18-mer in input reads. Then for 18-mers that occured only once we search for a similar 18-mer (Hamming distance = 1) that has > 1 occurences. If we find it, we replace the infrequent 18-mer with the more frequent one.   
 ##### Contig assembly
 Using corrected reads we build DeBruijn weighted graph, where each node represents a 17-mer present in the reads and each directed edge represents a 18-mer created from joining two connected 17-mers. Weights on the edges correspond to the total number of occurences of the 18-mer in reads. 
 
