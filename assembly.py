@@ -2,7 +2,6 @@
 import argparse
 from Bio import SeqIO
 from os import path
-from lecture_functions import kmerHist, correct1mm, DeBruijnGraph
 
 
 def parse_options():
@@ -31,10 +30,44 @@ def get_reads(reads_path):
 
 
 def select_parameters():
-    """Returns kmer size and frequency threshold for kmer correction """
-    k = 15  # todo: test for different values
-    freq_thr = 2  # todo: test for different values
+    """Return recommended kmer size and frequency threshold for kmer correction """
+    k = 18
+    freq_thr = 1
     return k, freq_thr
+
+
+def neighbors1mm(kmer, alpha):
+    """ Generate all neighbors at Hamming distance 1 from kmer """
+    neighbors = []
+    for j in range(len(kmer) - 1, -1, -1):
+        oldc = kmer[j]
+        for c in alpha:
+            if c == oldc: continue
+            neighbors.append(kmer[:j] + c + kmer[j + 1:])
+    return neighbors
+
+
+def kmerHist(reads, k):
+    """ Return k-mer histogram and average k-mer occurrences """
+    kmerhist = {}
+    for read in reads:
+        for kmer in [read[i:i + k] for i in range(len(read) - (k - 1))]:
+            kmerhist[kmer] = kmerhist.get(kmer, 0) + 1
+    return kmerhist
+
+
+def correct1mm(read, k, kmerhist, alpha, thresh):
+    """ Return an error-corrected version of read.  k = k-mer length.
+        kmerhist is kmer count map.  alpha is alphabet.  thresh is
+        count threshold above which k-mer is considered correct. """
+    for i in range(len(read) - (k - 1)):
+        kmer = read[i:i + k]
+        if kmerhist.get(kmer, 0) <= thresh:
+            for newkmer in neighbors1mm(kmer, alpha):
+                if kmerhist.get(newkmer, 0) > thresh:
+                    read = read[:i] + newkmer + read[i + k:]
+                    break
+    return read
 
 
 def correct_reads(reads, k, freq_threshold):
@@ -45,6 +78,32 @@ def correct_reads(reads, k, freq_threshold):
         read = correct1mm(read, k, kmerhist, alphabet, freq_threshold)
         corrected_reads.append(read)
     return corrected_reads
+
+
+class DeBruijnGraph:
+    """ De Bruijn directed weighted graph built from a collection of
+        strings. User supplies strings and k-mer length k.  Nodes
+        are k-1-mers.  An Edge corresponds to the k-mer that joins
+        a left k-1-mer to a right k-1-mer. """
+
+    @staticmethod
+    def chop(st, k):
+        """ Chop string into k-mers of given length """
+        for i in range(len(st) - (k - 1)):
+            yield st[i:i + k], st[i:i + k - 1], st[i + 1:i + k]
+
+    def __init__(self, strIter, k):
+        """ Build de Bruijn weighted graph given string iterator and k-mer
+            length k """
+        self.k1mers = set()
+        self.weights = {}  # maps graph edge (from, to) to edge weight
+        for st in strIter:
+            for kmer, km1L, km1R in self.chop(st, k):
+                self.k1mers.update([km1L, km1R])
+                if not (km1L, km1R) in self.weights.keys():
+                    self.weights[(km1L, km1R)] = 1
+                else:
+                    self.weights[(km1L, km1R)] += 1
 
 
 def get_contigs_greedy(DB_graph, k):
@@ -65,17 +124,17 @@ def get_contigs_greedy(DB_graph, k):
         contigs.remove(right_seq)
         contigs.append(new_contig)
         new_weights = []
-        for edge in weights:  # we merged two graph nodes, so we need to update their previous edges
+        for edge in weights:  # update edges
             el = edge[0]
             er = edge[1]
             if el == er:
                 pass
             elif el == right_seq and er == left_seq:  # would create a cycle, delete
                 pass
-            elif el == right_seq:  # edges from the 2nd node should now start in the merged node
+            elif el == right_seq:  # edges starting in the 2nd node should start in the merged node
                 new_edge = (new_contig, edge[1], edge[2])
                 new_weights.append(new_edge)
-            elif er == left_seq:  # edges previously pointing to the 1st node should point to the merged node
+            elif er == left_seq:  # edges pointing to the 1st node should point to the merged node
                 new_edge = (edge[0], new_contig, edge[2])
                 new_weights.append(new_edge)
             elif el != left_seq and er != right_seq:  # delete edges starting at 1st node or pointing to 2nd node
